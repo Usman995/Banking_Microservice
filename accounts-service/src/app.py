@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
-import os
+import logging
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///accounts.db'
@@ -17,7 +17,9 @@ def create_account():
     data = request.json
     if not data or 'user_id' not in data:
         return jsonify({'error': 'Invalid input'}), 400
-    
+    if data.get('initial_balance', 0) < 0:
+        return jsonify({'error': 'Initial balance cannot be negative'}), 400
+
     try:
         new_account = Account(user_id=data['user_id'], balance=data.get('initial_balance', 0.0))
         db.session.add(new_account)
@@ -38,7 +40,9 @@ def update_balance(account_id):
     data = request.json
     if not data or 'balance' not in data:
         return jsonify({'error': 'Invalid input'}), 400
-    
+    if data['balance'] < 0:
+        return jsonify({'error': 'Invalid input'}), 400
+
     try:
         account.balance = data['balance']
         db.session.commit()

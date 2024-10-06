@@ -17,6 +17,8 @@ def create_account():
     data = request.json
     if not data or 'user_id' not in data:
         return jsonify({'error': 'Invalid input'}), 400
+    if not isinstance(data['user_id'], int):
+        return jsonify({'error': 'Invalid user type'}), 400
     if data.get('initial_balance', 0) < 0:
         return jsonify({'error': 'Initial balance cannot be negative'}), 400
 

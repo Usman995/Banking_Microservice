@@ -20,6 +20,7 @@ def test_update_balance(account_id):
     assert response.status_code == 200
     print("Update balance test passed")
 
+
 if __name__ == "__main__":
     account_id = test_create_account()
     test_get_account(account_id)

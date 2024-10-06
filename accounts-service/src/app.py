@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, abort
 from flask_sqlalchemy import SQLAlchemy
 import logging
 
@@ -37,7 +37,9 @@ def create_account():
 
 @app.route('/accounts/<int:account_id>', methods=['GET'])
 def get_account(account_id):
-    account = Account.query.get_or_404(account_id)
+    account = Account.query.get(account_id)  # Use get() instead of get_or_404()
+    if account is None:
+        return jsonify({'error': 'Account does not exist'}), 404
     return jsonify({'id': account.id, 'user_id': account.user_id, 'balance': account.balance})
 
 @app.route('/accounts/<int:account_id>/balance', methods=['PUT'])

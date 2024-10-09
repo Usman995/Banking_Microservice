@@ -6,6 +6,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
 
 from flask import Flask, jsonify, request, abort
+from sqlalchemy.exc import DataError
 from flask_migrate import Migrate
 import logging
 from models import db, Transaction
@@ -31,17 +32,57 @@ def create_transaction():
             description=data.get('description', ''),
             balance_after=data['balance_after']
         )
-        logging.info(f'Transaction created: {transaction}')
+        logging.info(f'Transaction created: {transaction.id}')
         logging.info(f'Transaction balance after: {transaction.balance_after}')
         db.session.add(transaction)
         db.session.commit()
         return jsonify({'id': transaction.id, 'account_id': transaction.account_id, 'amount': transaction.amount, 'type': transaction.type, 'description': transaction.description, 'balance_after': transaction.balance_after, 'timestamp': transaction.timestamp}), 201
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
     except DataError as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        logging.error(f'Unexpected error: {str(e)}')
+        return jsonify({'error': 'An unexpected error occurred'}), 500
+
+@app.route('/transactions/<transaction_id>', methods=['GET'])
+def get_transaction(transaction_id):
+    try:
+        # Convert to integer
+        transaction_id = int(transaction_id)
+        logging.info("Transaction id is %s", transaction_id)
+        if transaction_id <= 0:
+            abort(400, description="Invalid transaction ID")
+    except ValueError:
+        abort(400, description="Invalid transaction ID")
+
+    transaction = Transaction.query.get(transaction_id)
+    if transaction is None:
+        abort(404, description="Transaction not found")
+
+    return jsonify({
+        'id': transaction.id,
+        'account_id': transaction.account_id,
+        'amount': transaction.amount,
+        'type': transaction.type,
+        'description': transaction.description,
+        'balance_after': transaction.balance_after,
+        'timestamp': transaction.timestamp
+    })
+
+
+
+@app.errorhandler(400)
+def bad_request(e):
+    return jsonify(error=str(e.description)), 400
+
+@app.errorhandler(404)
+def not_found(e):
+    return jsonify(error=str(e.description)), 404
+    
 
 
 def init_db():

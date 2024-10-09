@@ -21,6 +21,19 @@ class Transaction(db.Model):
     balance_after = db.Column(db.Float, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
+    @validates('account_id')
+    def validate_account_id(self, key, value):
+        if value is None:
+            raise ValueError("Account ID cannot be None")
+        if not isinstance(value, int):
+            raise ValueError("Account ID must be an integer")
+        if value <= 0:
+            raise ValueError("Account ID must be positive")
+        if value > 2**31 - 1:  # Assuming 32-bit integer limit
+            raise ValueError("Account ID is too large")
+        return value
+
+
     @validates('type')
     def validate_type(self, key, value):
         if value not in ('deposit', 'withdrawal', 'transfer'):

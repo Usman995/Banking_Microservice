@@ -1,6 +1,5 @@
 from flask import Flask, jsonify, request, abort
 from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
 import logging
 
 app = Flask(__name__)
@@ -38,7 +37,7 @@ def create_account():
 
 @app.route('/accounts/<int:account_id>', methods=['GET'])
 def get_account(account_id):
-    account = Account.query.get(account_id)  # Use get() instead of get_or_404()
+    account = Account.query.get(account_id)
     if account is None:
         return jsonify({'error': 'Account does not exist'}), 404
     return jsonify({'id': account.id, 'user_id': account.user_id, 'balance': account.balance})
@@ -59,6 +58,15 @@ def update_balance(account_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+@app.route('/accounts/<int:account_id>', methods=['DELETE'])
+def delete_account(account_id):
+    account = Account.query.get(account_id)
+    if account is None:
+        return jsonify({'error': 'Account does not exist'}), 404
+    db.session.delete(account)
+    db.session.commit()
+    return jsonify({'message': 'Account deleted successfully'}), 200
 
 def init_db():
     db.create_all()

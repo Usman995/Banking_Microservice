@@ -7,7 +7,7 @@ db = SQLAlchemy()
 class Account(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, nullable=False)
-    account_number = db.Column(db.String(20), unique=True, nullable=False)
+    account_number = db.Column(db.String(20), unique=True, nullable=False)  # Ensure this is set to unique
     account_type = db.Column(db.String(20), nullable=False)
     balance = db.Column(db.Float, default=0.0, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -28,6 +28,8 @@ class Account(db.Model):
 
     @validates('balance')
     def validate_balance(self, key, balance):
+        if balance is None:
+            balance = 0  # Default to 0 if None
         if not isinstance(balance, (int, float)) or balance < 0:
             raise ValueError("Balance must be a non-negative number")
         if balance > 10**9:  # Assuming 1 billion is too large

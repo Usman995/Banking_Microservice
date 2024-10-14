@@ -138,6 +138,42 @@ def list_transactions():
 
     return jsonify(response), 200
 
+
+@app.route('/transactions/<int:transaction_id>', methods=['PATCH'])
+def update_transaction(transaction_id):
+    transaction = Transaction.query.get_or_404(transaction_id)
+    
+    data = request.json
+    updatable_fields = ['description', 'category', 'tags', 'status']
+    
+    if not any(field in data for field in updatable_fields):
+        return jsonify({'error': 'No valid fields to update'}), 400
+
+    try:
+        for field in updatable_fields:
+            if field in data:
+                setattr(transaction, field, data[field])
+        
+        db.session.commit()
+        return jsonify({
+            'id': transaction.id,
+            'account_id': transaction.account_id,
+            'amount': transaction.amount,
+            'type': transaction.type,
+            'description': transaction.description,
+            'category': transaction.category,
+            'tags': transaction.tags,
+            'status': transaction.status,
+            'timestamp': transaction.timestamp,
+            'balance_after': transaction.balance_after
+        }), 200
+    except ValueError as e:
+        db.session.rollback()
+        bad_request(e)
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'An unexpected error occurred'}), 500
+
 @app.errorhandler(400)
 def bad_request(e):
     return jsonify(error=str(e.description)), 400

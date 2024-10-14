@@ -215,7 +215,6 @@ def test_list_transactions(client):
     assert data['total'] == 3  # Expecting 3 transactions
     assert len(data['transactions']) == 3
 
-    # Optionally, verify the contents of each transaction
     for transaction in data['transactions']:
         assert 'id' in transaction
         assert 'account_id' in transaction
@@ -283,3 +282,61 @@ def test_sorting(client):
     assert 'transactions' in data
     amounts = [t['amount'] for t in data['transactions']]
     assert amounts == sorted(amounts)
+
+
+def test_update_transaction(client):
+    # First, create a transaction
+    create_response = client.post('/transactions', json={
+        'account_id': 1,
+        'amount': 100.00,
+        'type': 'deposit',
+        'description': 'Test deposit',
+        'balance_after': 500.00
+    })
+    assert create_response.status_code == 201
+    transaction_id = create_response.json['id']
+
+    # Now, update the transaction
+    update_response = client.patch(f'/transactions/{transaction_id}', json={
+        'description': 'Updated description',
+        'category': 'Salary',
+        'tags': 'monthly,income',
+        'status': 'pending'  # Use the enum value string
+    })
+    assert update_response.status_code == 200
+    updated_data = update_response.json
+
+    assert updated_data['description'] == 'Updated description'
+    assert updated_data['category'] == 'Salary'
+    assert updated_data['tags'] == 'monthly,income'
+    assert updated_data['status'] == 'pending'
+
+    # Ensure immutable fields haven't changed
+    assert updated_data['amount'] == 100.00
+    assert updated_data['type'] == 'deposit'
+
+def test_update_transaction_immutable_fields(client):
+    # Create a transaction
+    create_response = client.post('/transactions', json={
+        'account_id': 1,
+        'amount': 100.00,
+        'type': 'deposit',
+        'description': 'Test deposit',
+        'balance_after': 500.00
+    })
+    assert create_response.status_code == 201
+    transaction_id = create_response.json['id']
+
+    # Attempt to update immutable fields
+    update_response = client.patch(f'/transactions/{transaction_id}', json={
+        'amount': 200.00,
+        'type': 'withdrawal'
+    })
+    assert update_response.status_code == 400  # The request fails
+    updated_data = update_response.json
+
+    get_response = client.get(f'/transactions/{transaction_id}')
+    assert get_response.status_code == 200
+    transaction_data = get_response.json
+    assert transaction_data['amount'] == 100.00
+    assert transaction_data['type'] == 'deposit'

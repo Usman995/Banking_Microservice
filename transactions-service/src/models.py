@@ -10,6 +10,8 @@ class Base(DeclarativeBase):
 
 db = SQLAlchemy(model_class=Base)
 
+
+
 class Transaction(db.Model):
     __tablename__ = 'transactions'
 
@@ -18,6 +20,9 @@ class Transaction(db.Model):
     amount = db.Column(db.Float, nullable=False)
     type = db.Column(Enum('deposit', 'withdrawal', 'transfer', name='transaction_type'), nullable=False)
     description = db.Column(db.String(200))
+    category = db.Column(db.String(50))
+    tags =  db.Column(db.String(100))
+    status = db.Column(Enum('pending', 'complete', 'failed'), default='complete')
     balance_after = db.Column(db.Float, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -53,6 +58,12 @@ class Transaction(db.Model):
         
         return value
 
+    @validates('status')
+    def validate_status(self, key, status):
+        valid_statuses = ['pending', 'completed', 'failed']
+        if status not in valid_statuses:
+            raise ValueError(f"Invalid status. Must be one of: {', '.join(valid_statuses)}")
+        return status
 
     def __repr__(self):
         return f'<Transaction {self.id}>'

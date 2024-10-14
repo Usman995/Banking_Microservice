@@ -163,3 +163,123 @@ def test_get_transaction_with_invalid_or_nonexistent_id(client, invalid_id, expe
         assert 'invalid transaction id' in data['error'].lower()
     elif expected_status == 404:
         assert 'transaction not found' in data['error'].lower()
+
+
+def create_test_transactions(client):
+    transaction_data = [
+        {
+            'account_id': 1,
+            'amount': 100.00,
+            'type': 'deposit',
+            'description': 'Test deposit',
+            'balance_after': 500.00
+        },
+        {
+            'account_id': 2,
+            'amount': 50.00,
+            'type': 'withdrawal',
+            'description': 'Test withdrawal',
+            'balance_after': 450.00
+        },
+        {
+            'account_id': 3,
+            'amount': 75.00,
+            'type': 'transfer',
+            'description': 'Test transfer',
+            'balance_after': 525.00
+        }
+    ]
+    
+    created_transactions = []
+    for transaction in transaction_data:
+        response = client.post(
+            '/transactions',
+            data=json.dumps(transaction),
+            content_type='application/json'
+        )
+        assert response.status_code == 201
+        created_transactions.append(response.get_json())
+    
+    return created_transactions
+
+def test_list_transactions(client):
+    # Create test transactions (assuming you have a function for this)
+    create_test_transactions(client)
+
+    response = client.get('/transactions')
+    assert response.status_code == 200
+    data = response.get_json()
+    
+    assert 'transactions' in data
+    assert 'total' in data
+    assert data['total'] == 3  # Expecting 3 transactions
+    assert len(data['transactions']) == 3
+
+    # Optionally, verify the contents of each transaction
+    for transaction in data['transactions']:
+        assert 'id' in transaction
+        assert 'account_id' in transaction
+        assert 'amount' in transaction
+        assert 'type' in transaction
+        assert 'description' in transaction
+        assert 'balance_after' in transaction
+        assert 'timestamp' in transaction
+
+def test_pagination(client):
+    create_test_transactions(client)
+
+    response = client.get('/transactions?page=1&per_page=2')
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert 'transactions' in data
+    assert len(data['transactions']) == 2
+    assert 'pagination' in data
+    assert data['pagination']['total'] == 3
+    assert data['pagination']['pages'] == 2
+    assert data['pagination']['page'] == 1
+    assert data['pagination']['per_page'] == 2
+
+    response = client.get('/transactions?page=2&per_page=2')
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert 'transactions' in data
+    assert len(data['transactions']) == 1
+
+@pytest.mark.parametrize("filter_param, expected_count", [
+    ('account_id=1', 1),
+    ('type=deposit', 1),
+    ('type=withdrawal', 1),
+    ('type=transfer', 1),
+])
+def test_filtering(client, filter_param, expected_count):
+    create_test_transactions(client)
+
+    response = client.get(f'/transactions?{filter_param}')
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert 'transactions' in data
+    assert len(data['transactions']) == expected_count
+
+    if 'account_id' in filter_param:
+        account_id = int(filter_param.split('=')[1])
+        assert all(t['account_id'] == account_id for t in data['transactions'])
+    elif 'type' in filter_param:
+        type_ = filter_param.split('=')[1]
+        assert all(t['type'] == type_ for t in data['transactions'])
+
+def test_sorting(client):
+    create_test_transactions(client)
+
+    response = client.get('/transactions?sort=amount&order=desc')
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert 'transactions' in data
+    amounts = [t['amount'] for t in data['transactions']]
+    assert amounts == sorted(amounts, reverse=True)
+
+    response = client.get('/transactions?sort=amount&order=asc')
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert 'transactions' in data
+    amounts = [t['amount'] for t in data['transactions']]
+    assert amounts == sorted(amounts)

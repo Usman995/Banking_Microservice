@@ -6,6 +6,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
 
 from flask import Flask, jsonify, request, abort
+from sqlalchemy import desc
 from sqlalchemy.exc import DataError
 from flask_migrate import Migrate
 import logging
@@ -73,7 +74,69 @@ def get_transaction(transaction_id):
         'timestamp': transaction.timestamp
     })
 
+@app.route('/transactions', methods=['GET'])
+def list_transactions():
+    # Get query parameters
+    page = request.args.get('page', type=int)
+    per_page = request.args.get('per_page', type=int)
+    account_id = request.args.get('account_id', type=int)
+    transaction_type = request.args.get('type')
+    sort_by = request.args.get('sort', 'timestamp')
+    order = request.args.get('order', 'desc')
 
+    # Start with a base query
+    query = Transaction.query
+
+    # Apply filters
+    if account_id:
+        query = query.filter(Transaction.account_id == account_id)
+    if transaction_type:
+        query = query.filter(Transaction.type == transaction_type)
+
+    # Apply sorting
+    if hasattr(Transaction, sort_by):
+        order_column = getattr(Transaction, sort_by)
+        if order == 'desc':
+            query = query.order_by(desc(order_column))
+        else:
+            query = query.order_by(order_column)
+
+    # Get total count
+    total = query.count()
+
+    # Apply pagination if both page and per_page are provided
+    if page is not None and per_page is not None:
+        paginated_transactions = query.paginate(page=page, per_page=per_page, error_out=False)
+        transactions = paginated_transactions.items
+    else:
+        transactions = query.all()
+
+    # Prepare the response
+    response = {
+        'transactions': [
+            {
+                'id': t.id,
+                'account_id': t.account_id,
+                'amount': t.amount,
+                'type': t.type,
+                'description': t.description,
+                'balance_after': t.balance_after,
+                'timestamp': t.timestamp.isoformat()
+            } for t in transactions
+        ],
+        'total': total
+    }
+
+    # Add pagination info if pagination was applied
+    if page is not None and per_page is not None:
+        response['pagination'] = {
+            'total': total,
+            'pages': paginated_transactions.pages,
+            'page': page,
+            'per_page': per_page
+        }
+
+    return jsonify(response), 200
 
 @app.errorhandler(400)
 def bad_request(e):
